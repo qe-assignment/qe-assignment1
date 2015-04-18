@@ -16,13 +16,24 @@ def setup_twitter_client
 end
 
 twitter_client = setup_twitter_client
+media_urls = Queue.new
 
-topics = ["fashion"]
-get '/' do 
-    stream do |out|
+topics = ["fashion, selfie"]
+get '/start_listening' do
+    Thread.new do
+        loop do
             twitter_client.filter(track: topics.join(",")) do |object|
+                # sleep(1)
                 tweet = object if object.is_a?(Twitter::Tweet) 
-                out << tweet.text
+                tweet.media.each do |m|
+                    media_urls << m.media_url
+                    puts m.media_url
+                end
             end
+        end
     end
+end
+
+get '/' do 
+    erb :index
 end
