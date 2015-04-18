@@ -19,19 +19,28 @@ twitter_client = setup_twitter_client
 media_urls = Queue.new
 
 topics = ["fashion, selfie"]
+thread_handle = nil
+
 get '/start_listening' do
-    Thread.new do
+    thread_handle = Thread.new do
         loop do
             twitter_client.filter(track: topics.join(",")) do |object|
                 # sleep(1)
                 tweet = object if object.is_a?(Twitter::Tweet) 
                 tweet.media.each do |m|
                     media_urls << m.media_url
-                    puts m.media_url
                 end
             end
         end
     end
+end
+
+get '/stop_listening' do
+    Thread.kill(thread_handle)
+end
+
+get '/get_image' do
+    "#{media_urls.pop}"
 end
 
 get '/' do 

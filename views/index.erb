@@ -4,14 +4,48 @@
     </head>
 <body>
 
+    <div>
+        <button id="start_button" onclick="start_listening()" type="button">Start listening</button>
+    </div>
 
-    <button id="start_button" onclick="start_listening()" type="button">Start listening</button>
+    <div>
+        <img id="newest_image"/>
+    </div>
 
     <script src="https://code.jquery.com/jquery-2.1.3.js"></script>
     <script>
+        $(function() {
+            console.log("log")
+        });
+
+        var update_image = function()
+        {
+            $.ajax({
+                url: "get_image",
+                contentType: "text/plain",
+                success: function(src) {
+                    $("#newest_image").attr("src",src)
+                }
+            }).done(function() {
+                if (listening) {
+                    update_image()
+                }
+            })
+        }
+
+        var listening = false
         var start_listening = function()
         {
-            $.ajax({ url: "start_listening"})
+            listening = !listening
+            if (listening) {
+                update_image()
+                $("#start_button").text("Stop listening")
+                $.ajax({ url: "start_listening"})
+            }
+            else {
+                $("#start_button").text("Start listening")
+                $.ajax({ url: "stop_listening"})
+            }
         }
     </script>
 
