@@ -12,6 +12,12 @@
         <img id="newest_image"/>
     </div>
 
+    <div id="thumbnails">
+     <% 10.times do |i| %>
+         <img/>
+      <% end %>
+    </div>
+
     <script src="https://code.jquery.com/jquery-2.1.3.js"></script>
     <script>
         $(function() {
@@ -20,11 +26,18 @@
 
         var update_image = function()
         {
+            var last_src = ""
+
             $.ajax({
                 url: "get_image",
                 contentType: "text/plain",
                 success: function(src) {
                     $("#newest_image").attr("src",src)
+                    last_src = $("#newest_image").attr("src")
+                    if (last_src) {
+                        $("#thumbnails").prepend("<img src='" + last_src + "'/>")
+                        $("#thumbnails").children().last().remove()
+                    }
                 }
             }).done(function() {
                 if (listening) {
