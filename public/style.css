@@ -1,0 +1,18 @@
+button#start_button {
+    margin-bottom: 20px;
+}
+
+img#newest_image {
+    height: 200px;
+    margin-bottom: 50px;
+}
+
+div#thumbnails {
+    height: 150px;
+}
+
+div#thumbnails img {
+    height: 80px;
+    margin: 5px;
+}
+
