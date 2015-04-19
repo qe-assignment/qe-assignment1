@@ -1,3 +1,4 @@
+require 'byebug'
 require 'sinatra'
 require 'twitter'
 require 'json'
@@ -25,8 +26,9 @@ end
 
 twitter_client = setup_twitter_client
 media_urls = Queue.new
+url_history = Set.new
 
-topics = ["fashion, selfie"]
+topics = ["fashion"]
 count = 0
 thread_handle = nil
 
@@ -35,12 +37,21 @@ get '/start_listening' do
     thread_handle = Thread.new do
         loop do
             twitter_client.filter(track: topics.join(",")) do |object|
-                # sleep(1)
                 tweet = object if object.is_a?(Twitter::Tweet) 
-                tweet.media.each do |m|
-                    media_urls << m.media_url
+                if tweet.media? and not tweet.possibly_sensitive?
+                    had_photo_and_not_duplicate = false
+                    tweet.media.each do |m|
+                        if m.is_a?(Twitter::Media::Photo) and not url_history.include?(m.media_url)
+                            had_photo_and_not_duplicate = true
+                            media_urls << m.media_url
+                            url_history.add(m.media_url)
+                        end
+                    end
+
+                    if had_photo_and_not_duplicate
+                        count += 1
+                    end
                 end
-                count += tweet.media.length
             end
         end
     end
