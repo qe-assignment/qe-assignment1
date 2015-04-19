@@ -11,6 +11,7 @@
 
     <div>
         <img id="newest_image"/>
+        <p id="running_average"> Running average: </p>
     </div>
 
     <div id="thumbnails">
@@ -47,12 +48,28 @@
             })
         }
 
+        var update_running_average = function()
+        {
+            $.ajax({
+                url: "get_running_average",
+                contentType: "text/plain",
+                success: function(avg) {
+                    $("#running_average").text("Running average: " + avg)
+                }
+            }).done(function() {
+                if (listening) {
+                    update_running_average()
+                }
+            })
+        }
+
         var listening = false
         var start_listening = function()
         {
             listening = !listening
             if (listening) {
                 update_image()
+                update_running_average()
                 $("#start_button").text("Stop listening")
                 $.ajax({ url: "start_listening"})
             }

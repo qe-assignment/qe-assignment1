@@ -15,13 +15,23 @@ def setup_twitter_client
     return client
 end
 
+$t_start = 0
+$t_acc = 0
+def total_time
+    running_time = Time.now.to_f - $t_start
+    return $t_acc + running_time
+end
+
+
 twitter_client = setup_twitter_client
 media_urls = Queue.new
 
 topics = ["fashion, selfie"]
+count = 0
 thread_handle = nil
 
 get '/start_listening' do
+    $t_start = Time.now.to_f
     thread_handle = Thread.new do
         loop do
             twitter_client.filter(track: topics.join(",")) do |object|
@@ -30,13 +40,20 @@ get '/start_listening' do
                 tweet.media.each do |m|
                     media_urls << m.media_url
                 end
+                count += tweet.media.length
             end
         end
     end
 end
 
 get '/stop_listening' do
+    $t_acc += Time.now.to_f - $t_start
     Thread.kill(thread_handle)
+end
+
+get '/get_running_average' do
+    sleep(0.1)
+    "#{(count / total_time).round(2)}"
 end
 
 get '/get_image' do
