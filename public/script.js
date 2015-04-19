@@ -2,6 +2,24 @@ $(function() {
     console.log("log")
 });
 
+$("#topic_form").submit(function(e) {
+    if (listening) {
+        $.ajax({
+            method: "POST",
+            url: "set_topic_while_running",
+            data: $( this ).serialize()
+        })
+    }
+    else {
+        $.ajax({
+            method: "POST",
+            url: "set_topic",
+            data: $( this ).serialize()
+        })
+        }
+    e.preventDefault()
+})
+
 var update_image = function()
 {
     var last_src = ""
@@ -47,7 +65,12 @@ var start_listening = function()
         update_image()
         update_running_average()
         $("#start_button").text("Stop listening")
-        $.ajax({ url: "start_listening"})
+        var topic = $("#topic").attr("value")
+        $.ajax({ 
+            url: "start_listening",
+            method: "POST",
+            data: { "topic" : topic }
+            })
     }
     else {
         $("#start_button").text("Start listening")

@@ -18,38 +18,38 @@ end
 
 $t_start = 0
 $t_acc = 0
-def total_time
-    running_time = Time.now.to_f - $t_start
-    return $t_acc + running_time
-end
+$count = 0
+$thread_handle = nil
+$twitter_client = setup_twitter_client
+$media_urls = Queue.new
+$url_history = Set.new
+$topics = ["fashion"]
 
-
-twitter_client = setup_twitter_client
-media_urls = Queue.new
-url_history = Set.new
-
-topics = ["fashion"]
-count = 0
-thread_handle = nil
-
-get '/start_listening' do
+def start_listening(topics = [])
+    if topics.empty?
+        topics = $topics
+    end
     $t_start = Time.now.to_f
-    thread_handle = Thread.new do
+    $thread_handle = Thread.new do
         loop do
-            twitter_client.filter(track: topics.join(",")) do |object|
+            $twitter_client.filter(track: topics.join(",")) do |object|
+                if not $thread_handle.alive?
+                    return
+                end
+
                 tweet = object if object.is_a?(Twitter::Tweet) 
                 if tweet.media? and not tweet.possibly_sensitive?
                     had_photo_and_not_duplicate = false
                     tweet.media.each do |m|
-                        if m.is_a?(Twitter::Media::Photo) and not url_history.include?(m.media_url)
+                        if m.is_a?(Twitter::Media::Photo) and not $url_history.include?(m.media_url)
                             had_photo_and_not_duplicate = true
-                            media_urls << m.media_url
-                            url_history.add(m.media_url)
+                            $media_urls << m.media_url
+                            $url_history.add(m.media_url)
                         end
                     end
 
                     if had_photo_and_not_duplicate
-                        count += 1
+                        $count += 1
                     end
                 end
             end
@@ -57,18 +57,42 @@ get '/start_listening' do
     end
 end
 
-get '/stop_listening' do
+def stop_listening
     $t_acc += Time.now.to_f - $t_start
-    Thread.kill(thread_handle)
+    Thread.kill($thread_handle)
+end
+
+def total_time
+    running_time = Time.now.to_f - $t_start
+    return $t_acc + running_time
+end
+
+post '/start_listening' do
+    start_listening()
+end
+
+get '/stop_listening' do
+    stop_listening
 end
 
 get '/get_running_average' do
     sleep(0.1)
-    "#{(count / total_time).round(2)}"
+    "#{($count / total_time).round(2)}"
 end
 
 get '/get_image' do
-    "#{media_urls.pop}"
+    "#{$media_urls.pop}"
+end
+
+post '/set_topic_while_running' do
+    stop_listening
+    sleep(0.5)
+    $media_urls.clear
+    start_listening([params["topic_text_field"]])
+end
+
+post '/set_topic' do
+    $topics = [params["topic_text_field"]]
 end
 
 get '/' do 
