@@ -2,10 +2,13 @@ require 'byebug'
 require 'sinatra'
 require 'twitter'
 require 'json'
+require 'facepp'
 
 def setup_twitter_client
-    file = File.read('twitter-keys.json')
+    file = File.open('twitter-keys.json', 'r')
     keys = JSON.load(file)
+    file.close
+
     client = Twitter::Streaming::Client.new do |config|
         config.consumer_key        = keys["consumer_key"]
         config.consumer_secret     = keys["consumer_secret"]
@@ -16,11 +19,24 @@ def setup_twitter_client
     return client
 end
 
+def setup_facepp_client
+    file = File.open('facepp-keys.json', 'r')
+    keys = JSON.load(file)
+    file.close
+
+    client = FacePP.new(keys["api_key"], keys["api_secret"])
+
+    return client
+end
+
 $t_start = 0
 $t_acc = 0
 $count = 0
+$male_count = 0
+$female_count = 0
 $thread_handle = nil
 $twitter_client = setup_twitter_client
+$facepp_client = setup_facepp_client
 $media_urls = Queue.new
 $url_history = Set.new
 $topics = ["fashion"]
@@ -42,6 +58,15 @@ def start_listening(topics = [])
                     had_photo_and_not_duplicate = false
                     tweet.media.each do |m|
                         if m.is_a?(Twitter::Media::Photo) and not $url_history.include?(m.media_url)
+                            response = $facepp_client.detection.detect(url: m.media_url)
+                            response["face"].each do |face|
+                                if face["attribute"]["gender"]["value"] == "Male"
+                                    $male_count += 1
+                                elsif face["attribute"]["gender"]["value"] == "Female"
+                                    $female_count += 1
+                                end
+                            end
+
                             had_photo_and_not_duplicate = true
                             $media_urls << m.media_url
                             $url_history.add(m.media_url)
@@ -73,11 +98,20 @@ end
 
 get '/stop_listening' do
     stop_listening
+    $media_urls.clear
+    $url_history.clear
 end
 
 get '/get_running_average' do
-    sleep(0.1)
     "#{($count / total_time).round(2)}"
+end
+
+get '/get_male_count' do
+    "#{$male_count}"
+end
+
+get '/get_female_count' do
+    "#{$female_count}"
 end
 
 get '/get_image' do
@@ -86,8 +120,6 @@ end
 
 post '/set_topic_while_running' do
     stop_listening
-    sleep(0.5)
-    $media_urls.clear
     start_listening([params["topic_text_field"]])
 end
 

@@ -42,17 +42,47 @@ var update_image = function()
     })
 }
 
+var update_male_count = function()
+{
+    $.ajax({
+        url: "get_male_count",
+        contentType: "text/plain",
+        success: function(count) {
+            $("#male_count").text("Male count: " + count)
+        }
+    }).done(function() {
+        if (listening) {
+            setTimeout('update_male_count()', 1000)
+        }
+    })
+}
+
+var update_female_count = function()
+{
+    $.ajax({
+        url: "get_female_count",
+        contentType: "text/plain",
+        success: function(count) {
+            $("#female_count").text("Female count: " + count)
+        }
+    }).done(function() {
+        if (listening) {
+            setTimeout('update_female_count()', 1000)
+        }
+    })
+}
+
 var update_running_average = function()
 {
     $.ajax({
         url: "get_running_average",
         contentType: "text/plain",
         success: function(avg) {
-            $("#running_average").text("Running average: " + avg)
+            $("#running_average").text("Running average: " + avg + " tweets/s")
         }
     }).done(function() {
         if (listening) {
-            update_running_average()
+            setTimeout('update_running_average()', 100)
         }
     })
 }
@@ -64,6 +94,8 @@ var start_listening = function()
     if (listening) {
         update_image()
         update_running_average()
+        update_male_count()
+        update_female_count()
         $("#start_button").text("Stop listening")
         var topic = $("#topic").attr("value")
         $.ajax({ 
