@@ -2,9 +2,9 @@
 
 ## Install
     $ gem install sinatra
+    $ gem install sinatra-websocket
     $ gem install thin
     $ gem install twitter
-    $ gem install sinatra
 
     $ git clone https://github.com/FacePlusPlus/facepp-ruby-sdk.git
 
