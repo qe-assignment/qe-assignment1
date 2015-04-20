@@ -1,5 +1,5 @@
-require 'byebug'
 require 'sinatra'
+require 'sinatra-websocket'
 require 'twitter'
 require 'json'
 require 'facepp'
@@ -34,57 +34,73 @@ $t_acc = 0
 $count = 0
 $male_count = 0
 $female_count = 0
-$thread_handle = nil
+$thread = nil
 $twitter_client = setup_twitter_client
 $facepp_client = setup_facepp_client
-$media_urls = Queue.new
 $url_history = Set.new
 $topics = ["fashion"]
+$image_ws = nil
+$running_average_ws = nil
+$male_count_ws = nil
+$female_count_ws = nil
 
 def start_listening(topics = [])
     if topics.empty?
         topics = $topics
     end
     $t_start = Time.now.to_f
-    $thread_handle = Thread.new do
-        loop do
+    $thread = Thread.new do
+        begin
             $twitter_client.filter(track: topics.join(",")) do |object|
-                if not $thread_handle.alive?
+
+                if not $thread.alive?
                     return
                 end
 
+                tweet = object if object.is_a?(Twitter::Tweet)
                 tweet = object if object.is_a?(Twitter::Tweet) 
                 if tweet.media? and not tweet.possibly_sensitive?
-                    had_photo_and_not_duplicate = false
                     tweet.media.each do |m|
-                        if m.is_a?(Twitter::Media::Photo) and not $url_history.include?(m.media_url)
-                            response = $facepp_client.detection.detect(url: m.media_url)
+                        if m.is_a?(Twitter::Media::Photo) and not $url_history.include?(m.media_url.to_s)
+                            response = $facepp_client.detection.detect(url: m.media_url.to_s)
                             response["face"].each do |face|
                                 if face["attribute"]["gender"]["value"] == "Male"
                                     $male_count += 1
+                                    Thread.new do
+                                        $male_count_ws.send($male_count.to_s)
+                                    end
                                 elsif face["attribute"]["gender"]["value"] == "Female"
                                     $female_count += 1
+                                    Thread.new do
+                                        $female_count_ws.send($female_count.to_s)
+                                    end
                                 end
                             end
 
-                            had_photo_and_not_duplicate = true
-                            $media_urls << m.media_url
-                            $url_history.add(m.media_url)
+                            Thread.new do
+                                $image_ws.send(m.media_url.to_s)
+                            end
+                            $count += 1
+                            running_avg = ($count / total_time).round(2)
+                            Thread.new do
+                                $running_average_ws.send(running_avg.to_s)
+                            end
+                            $url_history.add(m.media_url.to_s)
                         end
-                    end
-
-                    if had_photo_and_not_duplicate
-                        $count += 1
                     end
                 end
             end
+        rescue Twitter::Error::TooManyRequests
+            puts("TooManyRequests error")
+            sleep 5
+            retry
         end
     end
 end
 
 def stop_listening
     $t_acc += Time.now.to_f - $t_start
-    Thread.kill($thread_handle)
+    Thread.kill($thread)
 end
 
 def total_time
@@ -92,30 +108,61 @@ def total_time
     return $t_acc + running_time
 end
 
-post '/start_listening' do
-    start_listening()
+get '/register_image_ws' do
+    request.websocket do |ws|
+        ws.onopen do
+            $image_ws = ws
+        end
+        ws.onclose do
+            warn("websocket closed")
+            settings.sockets.delete(ws)
+        end
+    end
+end
+
+get '/register_running_average_ws' do
+    request.websocket do |ws|
+        ws.onopen do
+            $running_average_ws = ws
+        end
+        ws.onclose do
+            warn("websocket closed")
+            settings.sockets.delete(ws)
+        end
+    end
+end
+
+get '/register_male_count_ws' do
+    request.websocket do |ws|
+        ws.onopen do
+            $male_count_ws = ws
+        end
+        ws.onclose do
+            warn("websocket closed")
+            settings.sockets.delete(ws)
+        end
+    end
+end
+
+get '/register_female_count_ws' do
+    request.websocket do |ws|
+        ws.onopen do
+            $female_count_ws = ws
+        end
+        ws.onclose do
+            warn("websocket closed")
+            settings.sockets.delete(ws)
+        end
+    end
+end
+
+get '/start_listening' do
+    start_listening
 end
 
 get '/stop_listening' do
     stop_listening
-    $media_urls.clear
     $url_history.clear
-end
-
-get '/get_running_average' do
-    "#{($count / total_time).round(2)}"
-end
-
-get '/get_male_count' do
-    "#{$male_count}"
-end
-
-get '/get_female_count' do
-    "#{$female_count}"
-end
-
-get '/get_image' do
-    "#{$media_urls.pop}"
 end
 
 post '/set_topic_while_running' do
